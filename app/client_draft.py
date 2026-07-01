@@ -22,6 +22,26 @@ class ComplianceBlock(Exception):
     """Raised when the generated draft fails the self-check gate."""
 
 
+def _scrub(text: str) -> str:
+    """Remove any internal name from text before it reaches the prompt. Titles
+    can contain internal names (e.g. 'Connect with Ken Baratsa'), so we strip
+    them at the source rather than trust the title is clean. Belt to the gate's
+    suspenders: never feed a name in, and catch it if one slips."""
+    if not text:
+        return text
+    out = text
+    for name in sorted(INTERNAL_NAMES, key=len, reverse=True):
+        # case-insensitive removal
+        idx = out.lower().find(name.lower())
+        while idx != -1:
+            out = out[:idx] + out[idx + len(name):]
+            idx = out.lower().find(name.lower())
+    # tidy leftover artifacts from removed names
+    out = out.replace("(, ", "(").replace(", )", ")").replace("()", "")
+    out = " ".join(out.split())
+    return out.strip(" ,-")
+
+
 def _gather_client_visible():
     """Only statuses the client may see: completed, in_progress, on_hold_client.
     on_hold_internal and internal_blocked details are excluded here."""
@@ -29,14 +49,16 @@ def _gather_client_visible():
     completed = db.completed_since(week_start)
     ongoing = db.list_tasks(status="in_progress")
     awaiting_client = db.list_tasks(status="on_hold_client")
-    # strip internal-only fields before they ever reach the prompt
+    # strip internal-only fields AND scrub internal names from titles before the prompt
     def clean(t):
-        return {"ref": t["external_ref"], "title": t["title"], "workstream": t["workstream"]}
+        return {"ref": t["external_ref"], "title": _scrub(t["title"]), "workstream": t["workstream"]}
     return (
         [clean(t) for t in completed],
         [clean(t) for t in ongoing],
-        # for awaiting-client, the client needs to know WHAT decision is needed
-        [{"title": t["title"], "note": t["blocker_note"]} for t in awaiting_client],
+        # awaiting-client: client needs to know WHAT decision is needed, phrased
+        # from the title only. blocker_note is internal routing metadata (may name
+        # staff) and must NOT reach the prompt. Title only.
+        [{"title": _scrub(t["title"])} for t in awaiting_client],
     )
 
 
