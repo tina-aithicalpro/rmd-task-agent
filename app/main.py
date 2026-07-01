@@ -29,6 +29,16 @@ def check_api_key(x_api_key: str = Header(default="")) -> None:
         raise HTTPException(status_code=401, detail="Invalid or missing X-API-Key")
 
 
+def check_dashboard_key(x_api_key: str = Header(default=""), key: str = "") -> None:
+    """Dashboard-only auth. Accepts the key from the X-API-Key header OR a
+    ?key=... URL parameter, so the dashboard opens as a plain browser link.
+    Treat the resulting link like a password - it exposes the key in URL/history.
+    All OTHER endpoints stay header-only via check_api_key."""
+    if x_api_key == settings.API_KEY or key == settings.API_KEY:
+        return
+    raise HTTPException(status_code=401, detail="Invalid or missing key. Add ?key=YOUR_API_KEY to the URL.")
+
+
 # ---- request models ----
 class StatusUpdate(BaseModel):
     new_status: str = Field(..., description="to_do|in_progress|completed|on_hold_client|on_hold_internal")
@@ -103,10 +113,10 @@ def get_completed(since: str):
     return db.completed_since(since)
 
 
-@app.get("/dashboard", response_class=HTMLResponse, dependencies=[Depends(check_api_key)])
+@app.get("/dashboard", response_class=HTMLResponse, dependencies=[Depends(check_dashboard_key)])
 def get_dashboard():
     """Internal dashboard, rendered live from the database. Shows everything.
-    Authenticated - not world-open."""
+    Opens as a plain browser link with ?key=YOUR_API_KEY. Not world-open."""
     return dash.render_dashboard()
 
 
