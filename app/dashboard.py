@@ -50,8 +50,32 @@ def render_dashboard() -> str:
 
     ring_pct = int(AI_VISIBILITY_BASELINE)
     defects = [t for t in tasks if t["blocker_note"] and "LIVE" in (t["blocker_note"] or "").upper()]
-    all_sorted = sorted(tasks, key=lambda t: (STATUS_ORDER.index(t["status"]), t["id"]))
-    rows_html = "".join(_task_row(t) for t in all_sorted)
+
+    # group tasks by status into collapsible sections (open the working ones,
+    # collapse To Do since it is the largest and least actively worked)
+    section_meta = [
+        ("completed", "Completed", "done", False),
+        ("in_progress", "In Progress", "prog", True),
+        ("on_hold_client", "On Hold - Awaiting Client", "holdc", True),
+        ("on_hold_internal", "On Hold - Awaiting Internal", "holdi", True),
+        ("to_do", "To Do", "todo", False),
+    ]
+    sections_html = ""
+    for status_key, label, cls, open_default in section_meta:
+        items = [t for t in tasks if t["status"] == status_key]
+        rows = "".join(_task_row(t) for t in items)
+        open_attr = " open" if (open_default and items) else ""
+        body = (
+            f'<table><tr><th>Ref</th><th>Task</th><th>Status</th><th>Notes</th></tr>{rows}</table>'
+            if items else '<p class="muted" style="padding:10px 4px">No tasks in this status.</p>'
+        )
+        sections_html += (
+            f'<details class="statusgroup {cls}"{open_attr}>'
+            f'<summary><span class="dot"></span>{label}'
+            f'<span class="count">{len(items)}</span></summary>'
+            f'<div class="groupbody">{body}</div></details>'
+        )
+
     defect_html = "".join(
         f'<div class="redflag"><strong>Live defect:</strong> {t["external_ref"]} - {t["title"]}. {t["blocker_note"]}</div>'
         for t in defects
@@ -100,6 +124,18 @@ select.statussel{{font-family:inherit;font-size:13px;padding:5px 8px;border:1px 
 .score .meta p{{font-size:13px;color:var(--muted)}}
 .redflag{{background:#FBEEEC;border:1px solid #E7C3BD;border-left:3px solid var(--blocked);border-radius:4px;padding:12px 16px;margin-top:8px;font-size:13px;color:#7A2E26}}
 .muted{{color:var(--muted);font-size:12px}}
+.statusgroup{{background:var(--white);border:1px solid var(--line);border-radius:6px;margin-bottom:12px;overflow:hidden}}
+.statusgroup summary{{list-style:none;cursor:pointer;padding:14px 18px;font-family:'Cormorant Garamond',Georgia,serif;font-size:20px;font-weight:600;display:flex;align-items:center;gap:10px;user-select:none}}
+.statusgroup summary::-webkit-details-marker{{display:none}}
+.statusgroup summary:hover{{background:#FBF9F5}}
+.statusgroup .count{{margin-left:auto;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--muted);background:#EFEAE0;border-radius:20px;padding:2px 12px;min-width:34px;text-align:center}}
+.statusgroup .dot{{width:10px;height:10px;border-radius:50%;flex:0 0 10px}}
+.statusgroup.done .dot{{background:#5B7A5B}} .statusgroup.prog .dot{{background:var(--sage)}}
+.statusgroup.holdc .dot{{background:#C98A5A}} .statusgroup.holdi .dot{{background:#9A7B8A}} .statusgroup.todo .dot{{background:#A9A192}}
+.statusgroup .groupbody{{padding:0 4px 6px}}
+.statusgroup table{{border:none;border-radius:0}}
+.statusgroup summary::after{{content:"expand";font-family:'DM Sans',sans-serif;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-left:10px}}
+.statusgroup[open] summary::after{{content:"collapse"}}
 </style></head><body>
 <header class="top"><div class="wrap">
 <div><h1>RegenesisMD - Weekly Dashboard</h1>
@@ -148,10 +184,8 @@ select.statussel{{font-family:inherit;font-size:13px;padding:5px 8px;border:1px 
 <p>Clean five-engine baseline. Target {AI_VISIBILITY_TARGET}+. Prior 18 and 27 retired as poisoned by 401 auth failures.</p></div>
 </div>
 
-<h2>All Tasks ({len(tasks)})</h2>
-<table><tr><th>Ref</th><th>Task</th><th>Status</th><th>Notes</th></tr>
-{rows_html}
-</table>
+<h2>Tasks by Status ({len(tasks)})</h2>
+{sections_html}
 
 <h2>Compliance Watch (internal)</h2>
 <div class="redflag"><strong>Botox hard stop.</strong> RMD carries Dysport and Xeomin only. No Botox-named content ships until Dr. Vaidya confirms framing.</div>
