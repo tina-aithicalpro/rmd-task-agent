@@ -80,6 +80,7 @@ def render_dashboard() -> str:
         f'<div class="redflag"><strong>Live defect:</strong> {t["external_ref"]} - {t["title"]}. {t["blocker_note"]}</div>'
         for t in defects
     )
+    waiting_on_client = [t for t in tasks if t["status"] == "on_hold_client"]; attention_items = defects + [t for t in waiting_on_client if t not in defects]; attention_html = "".join(f'<div class="alertRow"><div><span class="ref">{t["external_ref"] or "-"}</span> <span class="title">{t["title"]}</span></div><span class="pill {"live" if t in defects else "waiting"}">{"LIVE DEFECT" if t in defects else "WAITING ON CLIENT"}</span></div>' for t in attention_items)
     now = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
 
     return f"""<!DOCTYPE html>
@@ -87,75 +88,88 @@ def render_dashboard() -> str:
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RegenesisMD - Weekly Dashboard</title>
 <style>
-:root{{--cream:#F5F2EC;--charcoal:#1C1C1E;--gold:#B8A06A;--sage:#8A9E8C;--sand:#C9B99A;--white:#FAF8F5;--line:#E4DED3;--muted:#6B6659;--blocked:#B5544A}}
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=JetBrains+Mono:wght@400;600&display=swap');
+:root{{
+--cream:#F3ECE2;--ink:#1E2142;--white:#FFFFFF;--line:#E7DFD2;--muted:#6B6659;
+--blush:#F3DCD6;--blocked:#8B2E2E;--waiting:#7A2E26;--waiting-bg:#E9C6C0;
+--peri1:#CBCBEA;--peri2:#9C9FDD;
+--sage:#5B7A5B;--holdc:#C9667C;--holdi:#B5544A;--todo:#A9A192;
+}}
 *{{box-sizing:border-box;margin:0;padding:0}}
-body{{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',-apple-system,Segoe UI,sans-serif;line-height:1.5;padding-bottom:60px}}
+body{{background:var(--cream);color:var(--ink);font-family:'DM Sans',-apple-system,Segoe UI,sans-serif;line-height:1.5;padding-bottom:60px}}
 .wrap{{max-width:1080px;margin:0 auto;padding:0 24px}}
-header.top{{background:var(--charcoal);color:var(--white);padding:26px 0;margin-bottom:22px}}
-header.top .wrap{{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px}}
-h1{{font-family:'Cormorant Garamond',Georgia,serif;font-weight:600;font-size:30px}}
-.sub{{color:var(--sand);font-size:13px;letter-spacing:.5px}}
-.cards{{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:22px}}
-.card{{background:var(--white);border:1px solid var(--line);border-radius:6px;padding:16px 14px;text-align:center}}
-.card .n{{font-family:'Cormorant Garamond',Georgia,serif;font-size:34px;font-weight:600;line-height:1}}
-.card .l{{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-top:8px}}
-.prog .n{{color:var(--sage)}} .done .n{{color:#5B7A5B}} .holdc .n{{color:#C98A5A}} .holdi .n{{color:#9A7B8A}} .todo .n{{color:#A9A192}}
-.toolbar{{display:flex;gap:12px;flex-wrap:wrap;align-items:center;background:var(--white);border:1px solid var(--line);border-radius:6px;padding:16px;margin-bottom:22px}}
-.btn{{background:var(--gold);color:#1C1C1E;border:none;border-radius:5px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}}
+header.top{{background:var(--ink);color:#fff;padding:22px 0}}
+header.top .wrap{{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}}
+h1{{font-family:'Cormorant Garamond',Georgia,serif;font-style:italic;font-weight:600;font-size:28px}}
+.sub{{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:#C7C8E8}}
+.btn{{background:#fff;color:var(--ink);border:1px solid #fff;border-radius:999px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}}
+.btn.sec{{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6)}}
 .btn:hover{{opacity:.9}}
-.btn.sec{{background:transparent;border:1px solid var(--gold);color:#8A6D2A}}
-h2{{font-family:'Cormorant Garamond',Georgia,serif;font-size:22px;font-weight:600;margin:22px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--line)}}
-table{{width:100%;border-collapse:collapse;background:var(--white);border:1px solid var(--line);border-radius:6px;overflow:hidden}}
+.alertBox{{background:var(--blush);border-radius:14px;padding:22px 26px;margin:26px 0}}
+.alertBox h2{{font-family:'Cormorant Garamond',Georgia,serif;font-size:26px;font-weight:600;display:inline}}
+.alertBox .tag{{font-family:'JetBrains Mono',monospace;color:#8B2E2E;font-size:12px;margin-left:12px}}
+.alertRow{{display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.35);border-radius:10px;padding:14px 18px;margin-top:14px}}
+.alertRow .ref{{font-family:'JetBrains Mono',monospace;color:#8A5A52;font-size:13px;margin-right:16px}}
+.alertRow .title{{font-weight:600;font-size:15px}}
+.pill{{font-family:'JetBrains Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:.5px;padding:5px 12px;border-radius:999px;font-weight:600}}
+.pill.live{{background:#8B2E2E;color:#fff}}
+.pill.waiting{{background:var(--waiting-bg);color:var(--waiting)}}
+.topgrid{{display:grid;grid-template-columns:1.6fr repeat(5,1fr);gap:16px;margin:26px 0}}
+.score{{background:var(--white);border-radius:14px;padding:20px;display:flex;align-items:center;gap:16px;box-shadow:0 1px 3px rgba(0,0,0,.05)}}
+.score .meta p.lbl{{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.5px;color:var(--muted);text-transform:uppercase}}
+.score .meta h3{{font-family:'Cormorant Garamond',Georgia,serif;font-size:26px;font-weight:600;margin:4px 0}}
+.score .meta p.desc{{font-size:12px;color:var(--muted);max-width:220px}}
+.card{{background:var(--white);border-radius:14px;padding:18px 16px;box-shadow:0 1px 3px rgba(0,0,0,.05)}}
+.card .l{{font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);display:flex;align-items:center;gap:6px}}
+.card .l .dot{{width:8px;height:8px;border-radius:50%;display:inline-block}}
+.card .n{{font-size:32px;font-weight:700;margin-top:8px}}
+.prog .dot{{background:var(--ink)}} .done .dot{{background:var(--sage)}} .holdc .dot{{background:var(--holdc)}} .holdi .dot{{background:var(--holdi)}} .todo .dot{{background:var(--todo)}}
+.tasksSection{{background:linear-gradient(180deg,var(--peri1),var(--peri2));position:relative;left:50%;right:50%;margin-left:-50vw;margin-right:-50vw;width:100vw;padding:32px 0 40px}}
+.tasksSection h2{{font-family:'Cormorant Garamond',Georgia,serif;font-size:24px;font-weight:600;color:var(--ink);margin-bottom:16px}}
+.statusgroup{{background:var(--white);border-radius:12px;margin-bottom:14px;overflow:hidden}}
+.statusgroup summary{{list-style:none;cursor:pointer;padding:16px 20px;font-family:'Cormorant Garamond',Georgia,serif;font-size:19px;font-weight:600;display:flex;align-items:center;gap:10px;user-select:none}}
+.statusgroup summary::-webkit-details-marker{{display:none}}
+.statusgroup .dot{{width:9px;height:9px;border-radius:50%;flex:0 0 9px}}
+.statusgroup.done .dot{{background:var(--sage)}} .statusgroup.prog .dot{{background:var(--ink)}}
+.statusgroup.holdc .dot{{background:var(--holdc)}} .statusgroup.holdi .dot{{background:var(--holdi)}} .statusgroup.todo .dot{{background:var(--todo)}}
+.statusgroup .count{{font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;color:var(--muted);background:#EFEAE0;border-radius:20px;padding:2px 10px;min-width:26px;text-align:center}}
+.statusgroup summary::after{{content:"expand";font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-left:auto}}
+.statusgroup[open] summary::after{{content:"collapse"}}
+.statusgroup .groupbody{{padding:0 6px 8px}}
+table{{width:100%;border-collapse:collapse}}
 th{{background:#EFEAE0;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);padding:10px 14px}}
 td{{padding:9px 14px;border-top:1px solid var(--line);font-size:14px;vertical-align:middle}}
-td.ref{{color:var(--muted);white-space:nowrap}} td.note{{color:var(--muted);font-size:12px}}
-select.statussel{{font-family:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:5px;background:var(--white);cursor:pointer}}
-.flag{{display:inline-block;font-size:10px;color:var(--blocked);border:1px solid var(--blocked);border-radius:4px;padding:1px 6px;margin-left:6px;font-weight:600}}
-.addform{{display:none;background:var(--white);border:1px solid var(--line);border-radius:6px;padding:16px;margin-bottom:22px;gap:10px;flex-wrap:wrap}}
-.addform.show{{display:flex}}
-.addform input,.addform select{{font-family:inherit;font-size:14px;padding:8px 10px;border:1px solid var(--line);border-radius:5px}}
-.addform input.title{{flex:1;min-width:240px}}
-#draftbox{{display:none;background:var(--white);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:6px;padding:18px;margin-bottom:22px;white-space:pre-wrap;font-size:14px;line-height:1.6}}
-#draftbox.show{{display:block}}
-#toast{{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--charcoal);color:#fff;padding:10px 18px;border-radius:6px;font-size:14px;opacity:0;transition:opacity .3s;z-index:99}}
-#toast.show{{opacity:1}}
-.score{{background:var(--white);border:1px solid var(--line);border-radius:6px;padding:18px 22px;margin-bottom:22px;display:flex;align-items:center;gap:22px;flex-wrap:wrap}}
-.score .meta h3{{font-family:'Cormorant Garamond',Georgia,serif;font-size:22px;font-weight:600;margin-bottom:4px}}
-.score .meta p{{font-size:13px;color:var(--muted)}}
-.redflag{{background:#FBEEEC;border:1px solid #E7C3BD;border-left:3px solid var(--blocked);border-radius:4px;padding:12px 16px;margin-top:8px;font-size:13px;color:#7A2E26}}
+td.ref{{color:var(--muted);white-space:nowrap;font-size:12px}}
+td.note{{color:var(--muted);font-size:12px}}
+select.statussel{{font-family:'DM Sans',sans-serif;font-size:13px;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--white);cursor:pointer}}
+.flag{{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:10px;color:#fff;background:#B5544A;border-radius:4px;padding:2px 6px;margin-left:6px;font-weight:600}}
 .muted{{color:var(--muted);font-size:12px}}
-.statusgroup{{background:var(--white);border:1px solid var(--line);border-radius:6px;margin-bottom:12px;overflow:hidden}}
-.statusgroup summary{{list-style:none;cursor:pointer;padding:14px 18px;font-family:'Cormorant Garamond',Georgia,serif;font-size:20px;font-weight:600;display:flex;align-items:center;gap:10px;user-select:none}}
-.statusgroup summary::-webkit-details-marker{{display:none}}
-.statusgroup summary:hover{{background:#FBF9F5}}
-.statusgroup .count{{margin-left:auto;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--muted);background:#EFEAE0;border-radius:20px;padding:2px 12px;min-width:34px;text-align:center}}
-.statusgroup .dot{{width:10px;height:10px;border-radius:50%;flex:0 0 10px}}
-.statusgroup.done .dot{{background:#5B7A5B}} .statusgroup.prog .dot{{background:var(--sage)}}
-.statusgroup.holdc .dot{{background:#C98A5A}} .statusgroup.holdi .dot{{background:#9A7B8A}} .statusgroup.todo .dot{{background:#A9A192}}
-.statusgroup .groupbody{{padding:0 4px 6px}}
-.statusgroup table{{border:none;border-radius:0}}
-.statusgroup summary::after{{content:"expand";font-family:'DM Sans',sans-serif;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-left:10px}}
-.statusgroup[open] summary::after{{content:"collapse"}}
+.addform{{display:none;background:var(--white);border-radius:10px;padding:16px;margin-bottom:22px;gap:10px;flex-wrap:wrap}}
+.addform.show{{display:flex}}
+.addform input,.addform select{{font-family:inherit;font-size:14px;padding:8px 10px;border:1px solid var(--line);border-radius:6px}}
+.addform input.title{{flex:1;min-width:240px}}
+#draftbox{{display:none;background:var(--white);border-left:3px solid var(--ink);border-radius:10px;padding:18px;margin-bottom:22px;white-space:pre-wrap;font-size:14px;line-height:1.6}}
+#draftbox.show{{display:block}}
+#toast{{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:6px;font-size:14px;opacity:0;transition:opacity .3s;z-index:99}}
+#toast.show{{opacity:1}}
+.redflag{{background:#FBEEEC;border-left:3px solid var(--blocked);border-radius:6px;padding:12px 16px;margin-top:8px;font-size:13px;color:#7A2E26}}
+.compliance{{padding:24px 0}}
+footer.dashFooter{{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#7A2E26;text-transform:uppercase;letter-spacing:.5px;padding:20px 0;border-top:1px solid rgba(0,0,0,.08)}}
 </style></head><body>
 <header class="top"><div class="wrap">
-<div><h1>RegenesisMD - Weekly Dashboard</h1>
-<div class="sub">Dr. Bhavna Vaidya, MD &nbsp;|&nbsp; live and editable from the task database</div></div>
-<div class="sub">{now} &nbsp;|&nbsp; INTERNAL</div>
+<div><h1>RegenesisMD</h1>
+<div class="sub">WEEKLY TASK DASHBOARD &middot; INTERNAL</div></div>
+<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+<div class="sub">{now}</div>
+<button class="btn sec" onclick="genDraft()">Generate client draft</button>
+<button class="btn" onclick="toggleAdd()">Add task</button>
+</div>
 </div></header>
 <div class="wrap">
 
-<div class="cards">
-<div class="card done"><div class="n">{counts['completed']}</div><div class="l">Completed</div></div>
-<div class="card prog"><div class="n">{counts['in_progress']}</div><div class="l">In Progress</div></div>
-<div class="card holdc"><div class="n">{counts['on_hold_client']}</div><div class="l">On Hold - Client</div></div>
-<div class="card holdi"><div class="n">{counts['on_hold_internal']}</div><div class="l">On Hold - Internal</div></div>
-<div class="card todo"><div class="n">{counts['to_do']}</div><div class="l">To Do</div></div>
-</div>
-
-<div class="toolbar">
-<button class="btn" onclick="toggleAdd()">+ Add Task</button>
-<button class="btn" onclick="genDraft()">Generate Client Draft</button>
-<span class="muted">Change a task's status from its dropdown. Changes save immediately.</span>
+<div class="alertBox">
+<h2>Needs attention today</h2><span class="tag">{len(attention_items)} items blocking progress</span>
+{attention_html if attention_items else '<p class="muted" style="margin-top:14px">Nothing needs attention right now.</p>'}
 </div>
 
 <div class="addform" id="addform">
@@ -168,35 +182,48 @@ select.statussel{{font-family:inherit;font-size:13px;padding:5px 8px;border:1px 
 <option value="on_hold_internal">On Hold - Internal</option>
 </select>
 <button class="btn" onclick="addTask()">Save Task</button>
-<button class="btn sec" onclick="toggleAdd()">Cancel</button>
+<button class="btn sec" style="color:var(--ink);border-color:var(--ink)" onclick="toggleAdd()">Cancel</button>
 </div>
 
 <div id="draftbox"></div>
 
+<div class="topgrid">
 <div class="score">
-<svg width="90" height="90" viewBox="0 0 36 36">
-<path d="M18 2.5a15.5 15.5 0 1 1 0 31 15.5 15.5 0 0 1 0-31" fill="none" stroke="#E4DED3" stroke-width="3"/>
-<path d="M18 2.5a15.5 15.5 0 1 1 0 31 15.5 15.5 0 0 1 0-31" fill="none" stroke="#B8A06A" stroke-width="3"
- stroke-dasharray="{ring_pct},100" stroke-linecap="round"/>
-<text x="18" y="19" text-anchor="middle" font-size="9" font-weight="700" fill="#1C1C1E">{ring_pct}</text>
-<text x="18" y="25" text-anchor="middle" font-size="3.4" fill="#6B6659">/ 100</text></svg>
-<div class="meta"><h3>AI Visibility Baseline: {AI_VISIBILITY_BASELINE} / 100</h3>
-<p>Clean five-engine baseline. Target {AI_VISIBILITY_TARGET}+. Prior 18 and 27 retired as poisoned by 401 auth failures.</p></div>
-</div>
+<svg width="86" height="86" viewBox="0 0 36 36">
+<path d="M18 2.5a15.5 15.5 0 1 1 0 31 15.5 15.5 0 0 1 0-31" fill="none" stroke="#E7DFD2" stroke-width="3"/>
+<path d="M18 2.5a15.5 15.5 0 1 1 0 31 15.5 15.5 0 0 1 0-31" fill="none" stroke="#1E2142" stroke-width="3" stroke-dasharray="{ring_pct},100" stroke-linecap="round"/>
+    <text x="18" y="19" text-anchor="middle" font-size="9" font-weight="700" fill="#1E2142">{ring_pct}</text>
+    <text x="18" y="25" text-anchor="middle" font-size="3.4" fill="#6B6659">/ 100</text></svg>
+    <div class="meta"><p class="lbl">AI Visibility Score</p><h3>{ring_pct} &rarr; {AI_VISIBILITY_TARGET}</h3><p class="desc">Baseline vs 90-day target. Every open task below moves this number.</p></div>
+    </div>
+    <div class="card prog"><div class="l"><span class="dot"></span>In Progress</div><div class="n">{counts['in_progress']}</div></div>
+    <div class="card done"><div class="l"><span class="dot"></span>Completed</div><div class="n">{counts['completed']}</div></div>
+    <div class="card holdc"><div class="l"><span class="dot"></span>On Hold - Client</div><div class="n">{counts['on_hold_client']}</div></div>
+    <div class="card holdi"><div class="l"><span class="dot"></span>On Hold - Internal</div><div class="n">{counts['on_hold_internal']}</div></div>
+    <div class="card todo"><div class="l"><span class="dot"></span>To Do</div><div class="n">{counts['to_do']}</div></div>
+    </div>
 
-<h2>Tasks by Status ({len(tasks)})</h2>
-{sections_html}
+    </div>
 
-<h2>Compliance Watch (internal)</h2>
-<div class="redflag"><strong>Botox hard stop.</strong> RMD carries Dysport and Xeomin only. No Botox-named content ships until Dr. Vaidya confirms framing.</div>
-{defect_html}
+    <div class="tasksSection"><div class="wrap">
+    <h2>Tasks by status <span class="muted">{len(tasks)} tasks</span></h2>
+    {sections_html}
+    </div></div>
 
-<footer style="margin-top:36px;font-size:12px;color:var(--muted);text-align:center;padding-top:18px;border-top:1px solid var(--line)">
-Live and editable from the RMD task database. INTERNAL ONLY. The client-facing draft routes to Jay for approval before sending.
-</footer>
-</div>
+    <div class="wrap">
+    <div class="compliance">
+    <h2>Compliance Watch (internal)</h2>
+    <div class="redflag"><strong>Botox hard stop.</strong> RMD carries Dysport and Xeomin only. No Botox-named content ships until Dr. Vaidya confirms framing.</div>
+    {defect_html}
+    </div>
 
-<div id="toast"></div>
+    <footer class="dashFooter">
+    <span>Internal dashboard &mdash; RegenesisMD &middot; Not for client distribution</span>
+    <span>{now}</span>
+    </footer>
+    </div>
+
+    <div id="toast"></div>
 
 <script>
 const KEY = new URLSearchParams(window.location.search).get('key') || '';
