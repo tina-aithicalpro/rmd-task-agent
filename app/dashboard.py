@@ -155,6 +155,9 @@ select.statussel{{font-family:'DM Sans',sans-serif;font-size:13px;padding:6px 10
 .redflag{{background:#FBEEEC;border-left:3px solid var(--blocked);border-radius:6px;padding:12px 16px;margin-top:8px;font-size:13px;color:#7A2E26}}
 .compliance{{padding:24px 0}}
 footer.dashFooter{{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#7A2E26;text-transform:uppercase;letter-spacing:.5px;padding:20px 0;border-top:1px solid rgba(0,0,0,.08)}}
+@media (max-width:900px){{ .topgrid{{grid-template-columns:repeat(3,1fr)}} }}
+@media (max-width:640px){{ .wrap{{padding:0 16px}} header.top{{padding:16px 0}} header.top .wrap{{flex-direction:column;align-items:flex-start}} h1{{font-size:22px}} .topgrid{{grid-template-columns:repeat(2,1fr);gap:10px}} .score{{grid-column:1 / -1}} .card .n{{font-size:24px}} .alertBox{{padding:16px 18px}} .alertRow{{flex-direction:column;align-items:flex-start;gap:8px}} .statusgroup summary{{padding:12px 14px;font-size:17px}} .groupbody{{overflow-x:auto}} table{{font-size:12px}} th,td{{padding:7px 8px}} td.note{{max-width:120px}} .addform{{flex-direction:column;align-items:stretch}} .addform input,.addform select{{width:100%;min-width:0}} .btn{{padding:8px 14px;font-size:12px}} }}
+@media (max-width:400px){{ .topgrid{{grid-template-columns:1fr}} }}
 </style></head><body>
 <header class="top"><div class="wrap">
 <div><h1>RegenesisMD</h1>
